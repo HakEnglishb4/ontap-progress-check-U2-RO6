@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Một trò chơi tương tác giúp người dùng học tiếng Anh bằng cách nghe câu và sắp xếp các từ theo đúng thứ tự." />
+    <title>Nghe và xếp từ thành câu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Nunito', sans-serif;
+      }
+      @keyframes shake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-6px); }
+        75% { transform: translateX(6px); }
+      }
+      .animate-shake {
+        animation: shake 0.5s ease-in-out;
+      }
+      .animate-fade-in {
+        animation: fadeIn 0.5s ease-in-out;
+      }
+      @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+    </style>
+</head>
+<body>
+    <noscript>Bạn cần bật JavaScript để chạy ứng dụng này.</noscript>
+    <div id="root"></div>
+
+    <script type="module">
+      import React from 'https://esm.sh/react@18.2.0';
+      import ReactDOM from 'https://esm.sh/react-dom@18.2.0/client';
+
+      const { useState, useCallback, useMemo, useRef, useEffect } = React;
+
+      // --- From types.ts ---
+      const GameState = {
+        Start: 0,
+        TopicSelection: 1,
+        Playing: 2,
+        Congrats: 3,
+      };
+
+      // --- From data/topics.ts ---
+      const topics = {
+        "My Ideal Neighbourhood": [
+            { en: "What is your ideal neighbourhood like?", vi: "Khu phố lý tưởng của bạn như thế nào? 🏘️🤔" },
+            { en: "My ideal neighbourhood is a place where everyone talks to each other.", vi: "Khu phố lý tưởng của tôi là nơi mọi người nói chuyện với nhau. 🗣️🤝" },
+            { en: "My ideal neighbourhood is a place where people feel safe on the streets.", vi: "Khu phố lý tưởng của tôi là nơi mọi người cảm thấy an toàn trên đường phố. 👮‍♀️👍" },
+            { en: "My ideal neighbourhood is a place with good schools and libraries.", vi: "Khu phố lý tưởng của tôi là nơi có trường học và thư viện tốt. 🏫📚" },
+            { en: "My ideal neighbourhood is a place with clean and wide streets.", vi: "Khu phố lý tưởng của tôi là nơi có đường phố sạch sẽ và rộng rãi. ✨🛣️" },
+            { en: "My ideal neighbourhood is a place with rows of trees along the streets.", vi: "Khu phố lý tưởng của tôi là nơi có những hàng cây dọc theo đường phố. 🌳" },
+            { en: "My ideal neighbourhood is a place with convenient facilities: a hospital, a park, a school, a supermarket, a sport centre, a library and a post office.", vi: "Khu phố lý tưởng của tôi là nơi có các tiện ích thuận lợi: bệnh viện, công viên, trường học, siêu thị, trung tâm thể thao, thư viện và bưu điện. 🏥🌳🏫🛒" },
+            { en: "My ideal neighbourhood is a place with more public transports and fewer personal vehicles.", vi: "Khu phố lý tưởng của tôi là nơi có nhiều phương tiện công cộng và ít xe cá nhân hơn. 🚌🚆" },
+            { en: "What does your ideal neighborhood look like?", vi: "Khu phố lý tưởng của bạn trông như thế nào? 🤔🏡" },
+            { en: "I do like nice houses with gardens and quiet streets.", vi: "Tôi thích những ngôi nhà đẹp có vườn và đường phố yên tĩnh. 🏡🌷" },
+            { en: "My ideal neighborhood is a place in the city where I can really feel comfortable and safe.", vi: "Khu phố lý tưởng của tôi là một nơi trong thành phố mà tôi có thể cảm thấy thực sự thoải mái và an toàn. 🏙️😌" },
+            { en: "It's a place with wide streets and pavements where I can walk safely.", vi: "Đó là một nơi có những con đường rộng và vỉa hè nơi tôi có thể đi bộ an toàn. 🚶‍♀️🚶‍♂️" },
+            { en: "There are lots of car parks so that people can find parking easily.", vi: "Có rất nhiều bãi đậu xe để mọi người có thể tìm chỗ đậu xe dễ dàng. 🅿️🚗" },
+            { en: "Police officers control the streets and make people feel safe.", vi: "Cảnh sát kiểm soát đường phố và làm cho mọi người cảm thấy an toàn. 👮‍♂️🚓" },
+            { en: "Older people can spend their mornings in the park while younger ones can jump there.", vi: "Người lớn tuổi có thể dành buổi sáng trong công viên trong khi những người trẻ hơn có thể nhảy nhót ở đó. 👴👵🤸‍♂️" },
+            { en: "Children can walk or cycle to school.", vi: "Trẻ em có thể đi bộ hoặc đạp xe đến trường. 🚶‍♀️🚲" },
+            { en: "There are shops for people to do their shopping and great restaurants to enjoy your meal.", vi: "Có những cửa hàng để mọi người mua sắm và những nhà hàng tuyệt vời để thưởng thức bữa ăn của bạn. 🛍️🍽️" },
+            { en: "How does my ideal neighborhood sound to you?", vi: "Khu phố lý tưởng của tôi nghe có vẻ như thế nào đối với bạn? 👂😊" },
+            { en: "Would you enjoy living there?", vi: "Bạn có thích sống ở đó không? 🤗" },
+            { en: "Is it in a busy city or in a quiet village?", vi: "Nó ở trong một thành phố sầm uất hay trong một ngôi làng yên tĩnh? 🏙️🏞️" },
+            { en: "My ideal neighborhood is a quiet place in the village.", vi: "Khu phố lý tưởng của tôi là một nơi yên tĩnh trong làng. 🏞️🏡" },
+            { en: "There are small cottages with beautiful gardens.", vi: "Có những ngôi nhà nhỏ với những khu vườn xinh đẹp. 🏡🌸" },
+            { en: "There are lots of trees and flowers along the streets.", vi: "Có rất nhiều cây và hoa dọc theo các con đường. 🌳🌷" },
+            { en: "It is a place where neighbors know each other and talk to each other on the street.", vi: "Đó là nơi hàng xóm biết nhau và nói chuyện với nhau trên đường. 👋🗣️" },
+            { en: "Children play happily in the streets or at the school playground or go swimming in the lake.", vi: "Trẻ em vui chơi trên đường phố hoặc tại sân chơi của trường hoặc đi bơi trong hồ. 🤸‍♀️🏊‍♂️" },
+            { en: "There's a main street with nice little shops, a small cafe and the pizza house.", vi: "Có một con đường chính với những cửa hàng nhỏ xinh, một quán cà phê nhỏ và một tiệm pizza. 🛍️☕🍕" },
+            { en: "The nearest city is a 15-minute drive.", vi: "Thành phố gần nhất cách đó 15 phút lái xe. 🚗🏙️" }
+        ],
+        "Daily Routines & Hobbies": [
+            { en: "People should work together because they can help each other and understand each other better.", vi: "Mọi người nên làm việc cùng nhau vì họ có thể giúp đỡ và hiểu nhau hơn. 🤝❤️" },
+            { en: "People should work together because they can solve the problems faster.", vi: "Mọi người nên làm việc cùng nhau vì họ có thể giải quyết vấn đề nhanh hơn. 💡🚀" },
+            { en: "People should work together because they can have more amazing ideas.", vi: "Mọi người nên làm việc cùng nhau vì họ có thể có nhiều ý tưởng tuyệt vời hơn. ✨🧠" },
+            { en: "He gets up at 8:00.", vi: "Anh ấy thức dậy lúc 8:00. ⏰☀️" },
+            { en: "We usually have lunch at 1:00.", vi: "Chúng tôi thường ăn trưa lúc 1:00. 🕛🥪" },
+            { en: "Tom does his homework in the afternoon.", vi: "Tom làm bài tập về nhà vào buổi chiều. 📚✍️" },
+            { en: "She helps a charity for children.", vi: "Cô ấy giúp một tổ chức từ thiện cho trẻ em. ❤️👧👦" },
+            { en: "In the evening, I play video games.", vi: "Vào buổi tối, tôi chơi trò chơi điện tử. 🎮🌃" },
+            { en: "We watch TV in the afternoon.", vi: "Chúng tôi xem TV vào buổi chiều. 📺🛋️" },
+            { en: "I always take a shower in the morning.", vi: "Tôi luôn tắm vào buổi sáng. 🚿☀️" },
+            { en: "We brush our teeth in the morning.", vi: "Chúng tôi đánh răng vào buổi sáng. 🦷✨" },
+            { en: "They go to the gym in the evening.", vi: "Họ đi tập gym vào buổi tối. 💪🏋️‍♀️" },
+            { en: "Ann likes playing board games.", vi: "Ann thích chơi board games. 🎲♟️" },
+            { en: "He hates doing jigsaw puzzles.", vi: "Anh ấy ghét chơi trò chơi ghép hình. 🧩😠" },
+            { en: "Keith likes hanging out with his friends at weekends.", vi: "Keith thích đi chơi với bạn bè vào cuối tuần. 😎👫" },
+            { en: "We don't like going shopping at the mall.", vi: "Chúng tôi không thích đi mua sắm ở trung tâm thương mại. 🛍️👎" },
+            { en: "They love going to the amusement park every Saturday evening.", vi: "Họ thích đến công viên giải trí vào mỗi tối thứ Bảy. 🎡🎢❤️" },
+            { en: "She works as a teacher.", vi: "Cô ấy làm nghề giáo viên. 👩‍🏫칠판" },
+            { en: "He buys books online.", vi: "Anh ấy mua sách trực tuyến. 💻📚" },
+            { en: "She washes the car every Friday.", vi: "Cô ấy rửa xe vào mỗi thứ Sáu. 🚗💦" },
+            { en: "He chats online in the evenings.", vi: "Anh ấy trò chuyện trực tuyến vào các buổi tối. 💻💬" },
+            { en: "She studies English on Mondays.", vi: "Cô ấy học tiếng Anh vào các ngày thứ Hai. 📚🇬🇧" },
+            { en: "We always have dinner at 18:00.", vi: "Chúng tôi luôn ăn tối lúc 18:00. 🕕🍽️" },
+            { en: "They watch TV in the evening.", vi: "Họ xem TV vào buổi tối. 📺🌃" },
+            { en: "We have music lessons on Mondays.", vi: "Chúng tôi có các buổi học nhạc vào thứ Hai. 🎵🎹" },
+            { en: "When I get home, I do some work for my parents and then we all have dinner at about 7:30.", vi: "Khi về nhà, tôi làm một số việc cho bố mẹ và sau đó cả nhà ăn tối vào khoảng 7:30. 🏡🍽️" },
+            { en: "It's a tiring day so I just have chat online after that for an hour.", vi: "Đó là một ngày mệt mỏi nên tôi chỉ trò chuyện trực tuyến sau đó trong một giờ. 😩💻💬" }
+        ],
+        "At School": [
+            { en: "We walk back home after school.", vi: "Chúng tôi đi bộ về nhà sau giờ học. 🚶‍♀️🚶‍♂️🏫" },
+            { en: "We walk to school every day.", vi: "Chúng tôi đi bộ đến trường mỗi ngày. 🚶‍♀️🏫" },
+            { en: "Tom is never late for school.", vi: "Tom không bao giờ đi học muộn. 🏃‍♂️💨" },
+            { en: "The school year in Vietnam begins in September and ends in May.", vi: "Năm học ở Việt Nam bắt đầu vào tháng Chín và kết thúc vào tháng Năm. 🇻🇳🏫🗓️" },
+            { en: "Most schools in Vietnam require uniform.", vi: "Hầu hết các trường học ở Việt Nam đều yêu cầu đồng phục. 👕🥋" },
+            { en: "Primary school lasts for five years and students finish it at the age of eleven.", vi: "Trường tiểu học kéo dài trong năm năm và học sinh hoàn thành nó ở tuổi mười một. 🏫👦👧" },
+            { en: "At the end of primary school, students go to secondary school.", vi: "Kết thúc bậc tiểu học, học sinh lên trung học cơ sở. 🎓🏫" },
+            { en: "Secondary school lasts four years and students finish it at the age of fifteen.", vi: "Trường trung học cơ sở kéo dài bốn năm và học sinh hoàn thành nó ở tuổi mười lăm. 🏫👨‍🎓👩‍🎓" },
+            { en: "After students complete four years of secondary school, they go to high school for three years.", vi: "Sau khi học sinh hoàn thành bốn năm trung học cơ sở, họ học trung học phổ thông trong ba năm. 🏫🧑‍🏫" },
+            { en: "High school is for students aged sixteen to eighteen.", vi: "Trường trung học phổ thông dành cho học sinh từ mười sáu đến mười tám tuổi. 👨‍🏫👩‍🏫" },
+            { en: "Students can choose to do professional training after they finish high school.", vi: "Học sinh có thể chọn học nghề sau khi tốt nghiệp trung học phổ thông. 👷‍♀️👩‍🍳" },
+            { en: "I live in Alaska so my day is a bit different to most children.", vi: "Tôi sống ở Alaska nên ngày của tôi hơi khác so với hầu hết trẻ em. ❄️🐻" },
+            { en: "First of all, I get up at 5:30 in the morning and leave my house at 6:30.", vi: "Trước hết, tôi thức dậy lúc 5:30 sáng và rời khỏi nhà lúc 6:30. ⏰🌅" },
+            { en: "It takes 2:00 hours to get to school and I don't go on the bus.", vi: "Mất 2 giờ để đến trường và tôi không đi xe buýt. ⏳🚌❌" },
+            { en: "There is a boat that comes along the river and picks up the students 1 by 1.", vi: "Có một chiếc thuyền đi dọc sông và đón từng học sinh một. 🚤🏞️" },
+            { en: "In the middle of winter, we don't have any school at all.", vi: "Vào giữa mùa đông, chúng tôi không đi học chút nào. ❄️🏫❌" },
+            { en: "That's because the water in the river turns into ice.", vi: "Đó là vì nước trên sông biến thành băng. 🏞️🧊" },
+            { en: "Also at that time of year it's dark 24 hours a day.", vi: "Vào thời điểm đó trong năm trời cũng tối 24 giờ một ngày. 🌃🌑" },
+            { en: "Anyway, I usually get to school at 8:30 we leave again at 3:30 in the afternoon.", vi: "Dù sao thì, tôi thường đến trường lúc 8:30 và chúng tôi lại rời đi lúc 3:30 chiều. 🏫🕒" }
+        ]
+      };
+
+
+      // --- From hooks/useSpeechSynthesis.ts ---
+      const useSpeechSynthesis = () => {
+        const [isSpeaking, setIsSpeaking] = useState(false);
+        const [voices, setVoices] = useState([]);
+        const utteranceRef = useRef(null);
+
+        const updateVoices = useCallback(() => {
+          if ('speechSynthesis' in window) {
+            const availableVoices = window.speechSynthesis.getVoices();
+            const englishVoices = availableVoices.filter(voice => voice.lang.startsWith('en'));
+            setVoices(englishVoices);
+          }
+        }, []);
+
+        useEffect(() => {
+          if ('speechSynthesis' in window) {
+            updateVoices();
+            window.speechSynthesis.onvoiceschanged = updateVoices;
+            return () => {
+              if (window.speechSynthesis) {
+                window.speechSynthesis.onvoiceschanged = null;
+              }
+            }
+          }
+        }, [updateVoices]);
+
+        const cancel = useCallback(() => {
+          if (window.speechSynthesis) {
+              window.speechSynthesis.cancel();
+          }
+        }, []);
+
+        useEffect(() => {
+          return () => {
+              cancel();
+          }
+        }, [cancel]);
+
+        const speak = useCallback((text, options = {}) => {
+          cancel();
+          
+          if (!('speechSynthesis' in window)) {
+              console.warn("Speech Synthesis not supported in this browser.");
+              if (options.onEnd) options.onEnd();
+              return;
+          }
+          
+          const { rate = 1.0, onBoundary, onEnd, voice } = options;
+
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'en-US';
+          utterance.rate = rate;
+          if (voice) {
+            utterance.voice = voice;
+          }
+          utteranceRef.current = utterance;
+
+          utterance.onstart = () => setIsSpeaking(true);
+          
+          if (onBoundary) {
+            utterance.onboundary = (event) => {
+              if (event.name === 'word') {
+                const words = text.split(' ');
+                let cumulativeLength = 0;
+                for (let i = 0; i < words.length; i++) {
+                  cumulativeLength += words[i].length + 1; // Add length of word + 1 for the space
+                  if (event.charIndex < cumulativeLength) {
+                      onBoundary(i);
+                      return; // Exit loop once the word is found
+                  }
+                }
+              }
+            };
+          }
+
+          utterance.onend = () => {
+            setIsSpeaking(false);
+            utteranceRef.current = null;
+            if (onEnd) onEnd();
+          };
+
+          utterance.onerror = (event) => {
+            if (event.error !== 'interrupted') {
+              console.error('SpeechSynthesis Error:', event.error);
+            }
+            setIsSpeaking(false);
+            utteranceRef.current = null;
+            if (onEnd) onEnd();
+          };
+          
+          setTimeout(() => {
+              window.speechSynthesis.speak(utterance);
+          }, 50);
+
+        }, [cancel]);
+
+        return { speak, cancel, isSpeaking, voices };
+      };
+
+      // --- From components/Fireworks.tsx ---
+      const Fireworks = () => {
+        const canvasRef = useRef(null);
+        const animationFrameId = useRef();
+        const particles = useRef([]);
+
+        const createParticle = (x, y) => {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = Math.random() * 6 + 2;
+          return {
+            x, y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            color: `hsl(${Math.random() * 360}, 100%, 70%)`,
+            size: Math.random() * 3 + 1,
+            life: 1,
+            fade: 0.02,
+          };
+        };
+
+        const createExplosion = () => {
+          if (!canvasRef.current) return;
+          const x = Math.random() * canvasRef.current.width;
+          const y = Math.random() * canvasRef.current.height / 2;
+          for (let i = 0; i < 50; i++) {
+            particles.current.push(createParticle(x, y));
+          }
+        };
+
+        const animate = () => {
+          if (!canvasRef.current) return;
+          const ctx = canvasRef.current.getContext('2d');
+          if (!ctx) return;
+          
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+          ctx.fillRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+          ctx.globalCompositeOperation = 'lighter';
+          
+          particles.current = particles.current.filter(p => p.life > 0);
+
+          particles.current.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.vy += 0.05;
+            p.life -= p.fade;
+            
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fillStyle = `hsla(${p.color.match(/\\d+/)?.[0]}, 100%, 70%, ${p.life})`;
+            ctx.fill();
+          });
+
+          animationFrameId.current = requestAnimationFrame(animate);
+        };
+
+        useEffect(() => {
+          const canvas = canvasRef.current;
+          if (canvas) {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            const handleResize = () => {
+              canvas.width = window.innerWidth;
+              canvas.height = window.innerHeight;
+            };
+            window.addEventListener('resize', handleResize);
+            
+            const intervalIds = [];
+            for(let i = 0; i < 5; i++) {
+                intervalIds.push(setTimeout(() => createExplosion(), Math.random() * 1000));
+            }
+            const mainInterval = setInterval(createExplosion, 500 + Math.random() * 500);
+            intervalIds.push(mainInterval);
+            animate();
+            return () => {
+              window.removeEventListener('resize', handleResize);
+              if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
+              intervalIds.forEach(clearInterval);
+              particles.current = [];
+            };
+          }
+        }, []);
+
+        return React.createElement('canvas', { ref: canvasRef, className: "fixed top-0 left-0 w-full h-full pointer-events-none z-50" });
+      };
+
+      // --- From components/TopicCongratsScreen.tsx ---
+      const TopicCongratsScreen = ({
+        playerName, topicName, correctCount, totalCount, onPlayAgain, onChooseAnotherTopic,
+      }) => {
+        return React.createElement('div', { className: "relative flex flex-col items-center gap-6 text-center p-4 animate-fade-in" },
+          React.createElement(Fireworks),
+          React.createElement('div', { className: "text-2xl sm:text-3xl md:text-4xl text-green-600 font-extrabold" },
+            React.createElement('p', null, "Chúc mừng ", React.createElement('strong', { className: "text-purple-600" }, playerName), "!"),
+            React.createElement('p', { className: "mt-2" }, `Bạn đã hoàn thành chủ đề "${topicName}".`)
+          ),
+          React.createElement('p', { className: "text-xl sm:text-2xl text-slate-700 font-semibold" }, `Bạn đã trả lời đúng ${correctCount}/${totalCount} câu.`),
+          React.createElement('div', { className: "flex flex-col sm:flex-row gap-4 mt-6 w-full max-w-md" },
+            React.createElement('button', {
+              onClick: onPlayAgain,
+              className: "w-full p-4 text-xl rounded-2xl bg-blue-500 text-white font-bold transform hover:scale-105 hover:bg-blue-600 transition-all shadow-lg"
+            }, "Chơi lại chủ đề này"),
+            React.createElement('button', {
+              onClick: onChooseAnotherTopic,
+              className: "w-full p-4 text-xl rounded-2xl bg-orange-500 text-white font-bold transform hover:scale-105 hover:bg-orange-600 transition-all shadow-lg"
+            }, "Chọn chủ đề khác")
+          )
+        );
+      };
+
+      // --- From components/StartScreen.tsx ---
+      const StartScreen = ({ onStart }) => {
+        const [name, setName] = useState('');
+        const handleStartClick = () => {
+          if (name.trim()) {
+            onStart(name.trim());
+          } else {
+            alert('Vui lòng nhập tên của bạn để bắt đầu!');
+          }
+        };
+        const handleKeyPress = (event) => {
+          if (event.key === 'Enter') handleStartClick();
+        };
+
+        return React.createElement('div', { className: "flex flex-col items-center gap-6 animate-fade-in" },
+          React.createElement('input', {
+            type: "text",
+            value: name,
+            onChange: (e) => setName(e.target.value),
+            onKeyPress: handleKeyPress,
+            placeholder: "Nhập tên của bạn...",
+            className: "font-nunito text-lg sm:text-xl p-3 px-5 rounded-2xl border-2 border-purple-400 text-center w-full max-w-sm focus:outline-none focus:ring-4 focus:ring-purple-300 transition-shadow shadow-inner"
+          }),
+          React.createElement('button', {
+            onClick: handleStartClick,
+            className: "p-4 px-10 text-xl sm:text-2xl rounded-2xl w-full max-w-sm bg-green-500 text-white font-bold transform hover:scale-105 hover:bg-green-600 active:scale-100 transition-all shadow-lg hover:shadow-xl"
+          }, "Bắt đầu")
+        );
+      };
+
+      // --- From components/TopicSelectionScreen.tsx ---
+      const topicColors = [
+        'from-red-500 to-red-600', 'from-blue-500 to-blue-600', 'from-green-500 to-green-600',
+        'from-orange-500 to-orange-600', 'from-cyan-500 to-cyan-600', 'from-pink-500 to-pink-600',
+      ];
+      const TopicSelectionScreen = ({ topics, onSelectTopic }) => {
+        return React.createElement('div', { className: "flex flex-col items-center gap-4 w-full animate-fade-in" },
+          React.createElement('h2', { className: "text-2xl sm:text-3xl font-bold mb-4 text-slate-700" }, "Chọn một chủ đề để học:"),
+          React.createElement('div', { className: "grid grid-cols-1 md:grid-cols-2 gap-5 w-full max-w-2xl" },
+            topics.map((topic, index) => (
+              React.createElement('button', {
+                key: topic,
+                onClick: () => onSelectTopic(topic),
+                className: `p-4 text-lg text-white font-bold rounded-2xl transform hover:-translate-y-1 transition-all shadow-lg hover:shadow-xl bg-gradient-to-br ${topicColors[index % topicColors.length]}`
+              }, topic)
+            ))
+          )
+        );
+      };
+
+      // --- From components/GameScreen.tsx ---
+      const shuffle = (array) => {
+        const newArray = [...array];
+        for (let i = newArray.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+        }
+        return newArray;
+      };
+      const pastelColors = [
+        'bg-sky-200 border-sky-400 text-sky-800 hover:bg-sky-300 hover:border-sky-500',
+        'bg-emerald-200 border-emerald-400 text-emerald-800 hover:bg-emerald-300 hover:border-emerald-500',
+        'bg-rose-200 border-rose-400 text-rose-800 hover:bg-rose-300 hover:border-rose-500',
+        'bg-amber-200 border-amber-400 text-amber-800 hover:bg-amber-300 hover:border-amber-500',
+        'bg-violet-200 border-violet-400 text-violet-800 hover:bg-violet-300 hover:border-violet-500',
+        'bg-teal-200 border-teal-400 text-teal-800 hover:bg-teal-300 hover:border-teal-500',
+      ];
+      const GameScreen = ({ sentences, onTopicComplete, onChooseAnotherTopic }) => {
+        const [currentIndex, setCurrentIndex] = useState(0);
+        const [currentWords, setCurrentWords] = useState([]);
+        const [shuffledWords, setShuffledWords] = useState([]);
+        const [playerAnswer, setPlayerAnswer] = useState([]);
+        const [mistakeCount, setMistakeCount] = useState(0);
+        const [incorrectWord, setIncorrectWord] = useState(null);
+        const [message, setMessage] = useState(null);
+        const [score, setScore] = useState(0);
+        const [correctlyAnswered, setCorrectlyAnswered] = useState(0);
+        const [isSentenceDone, setIsSentenceDone] = useState(false);
+        const [highlightedIndex, setHighlightedIndex] = useState(-1);
+        const allowSecondPlay = useRef(true);
+        const { speak, cancel, isSpeaking, voices } = useSpeechSynthesis();
+        const [selectedVoiceURI, setSelectedVoiceURI] = useState(null);
+        
+        const selectedVoice = useMemo(() => {
+          if (!voices || voices.length === 0) return null;
+          if (selectedVoiceURI) {
+            return voices.find(v => v.voiceURI === selectedVoiceURI);
+          }
+          return voices.find(v => v.name === 'Google US English') || voices.find(v => v.default) || voices[0];
+        }, [voices, selectedVoiceURI]);
+
+        useEffect(() => {
+            if (voices.length > 0 && !selectedVoiceURI) {
+                const defaultVoice = voices.find(v => v.name === 'Google US English') || voices.find(v => v.default) || voices[0];
+                if (defaultVoice) {
+                    setSelectedVoiceURI(defaultVoice.voiceURI);
+                }
+            }
+        }, [voices, selectedVoiceURI]);
+
+        const currentSentence = useMemo(() => sentences[currentIndex], [sentences, currentIndex]);
+
+        const startNewSentence = useCallback(() => {
+          if (currentIndex >= sentences.length) {
+            onTopicComplete(correctlyAnswered, sentences.length);
+            return;
+          }
+          setIsSentenceDone(false);
+          setPlayerAnswer([]);
+          setMistakeCount(0);
+          setMessage(null);
+          setHighlightedIndex(-1);
+          const cleanSentence = sentences[currentIndex].en.replace(/[.!?]$/, '');
+          const words = cleanSentence.split(' ');
+          setCurrentWords(words);
+          setShuffledWords(shuffle(words));
+          allowSecondPlay.current = true;
+          
+          const speakOptions = { rate: 0.9, voice: selectedVoice };
+
+          speak(sentences[currentIndex].en, {
+              ...speakOptions,
+              onEnd: () => {
+                  if (allowSecondPlay.current) {
+                      setTimeout(() => {
+                          if (allowSecondPlay.current) speak(sentences[currentIndex].en, speakOptions);
+                      }, 400);
+                  }
+              }
+          });
+        }, [currentIndex, sentences, onTopicComplete, correctlyAnswered, speak, selectedVoice]);
+        
+        const stopPendingActions = useCallback(() => {
+          allowSecondPlay.current = false;
+          cancel();
+        }, [cancel]);
+
+        useEffect(() => {
+          startNewSentence();
+          return stopPendingActions;
+        }, [currentIndex]);
+        
+        useEffect(() => {
+          return stopPendingActions;
+        }, [stopPendingActions]);
+
+        const handleListenAgain = () => {
+          if (currentSentence) {
+              stopPendingActions();
+              speak(currentSentence.en, { rate: 0.9, voice: selectedVoice });
+          }
+        };
+
+        const handleWordClick = (word, index) => {
+          if (isSentenceDone) return;
+          stopPendingActions();
+          const correctWord = currentWords[playerAnswer.length];
+          if (word === correctWord) {
+            setPlayerAnswer([...playerAnswer, word]);
+            setShuffledWords(prev => {
+              const newArr = [...prev];
+              const wordIndex = newArr.findIndex((w, i) => w === word && i === index);
+              if (wordIndex > -1) newArr[wordIndex] = '';
+              return newArr;
+            });
+            setMessage(null);
+            if (playerAnswer.length + 1 === currentWords.length) {
+              setIsSentenceDone(true);
+              let newScore = score;
+              let newCorrectlyAnswered = correctlyAnswered;
+              if (mistakeCount <= 2) {
+                newScore += 10;
+                newCorrectlyAnswered++;
+                setScore(newScore);
+                setCorrectlyAnswered(newCorrectlyAnswered);
+                setMessage({ text: 'Chính xác! +10 điểm.', type: 'success' });
+              } else {
+                setMessage({ text: `Bạn đã sai ${mistakeCount} lần, không được cộng điểm câu này.`, type: 'error' });
+              }
+              speak(currentSentence.en, { 
+                  voice: selectedVoice,
+                  onBoundary: (wordIndex) => setHighlightedIndex(wordIndex),
+                  onEnd: () => {
+                    setHighlightedIndex(-1);
+                    setTimeout(() => setCurrentIndex(prev => prev + 1), 2000);
+                  }
+              });
+            }
+          } else {
+            setMistakeCount(prev => prev + 1);
+            setIncorrectWord(`${word}-${index}`);
+            setMessage({ text: `Sai rồi! (Số lần sai: ${mistakeCount + 1})`, type: 'error' });
+            setTimeout(() => setIncorrectWord(null), 500);
+          }
+        };
+
+        return React.createElement('div', { className: "flex flex-col items-center gap-2 w-full animate-fade-in" },
+          React.createElement('div', { className: "w-full text-center bg-purple-100/70 p-3 rounded-2xl" },
+            React.createElement('div', { className: "text-xl sm:text-2xl text-purple-900 italic font-semibold" }, `“${currentSentence?.vi}”`)
+          ),
+          React.createElement('div', { className: "text-2xl sm:text-3xl font-bold mt-2 mb-1 min-h-[100px] bg-violet-50 p-4 rounded-xl shadow-inner w-full flex items-center justify-center flex-wrap gap-x-2.5 gap-y-3" },
+            isSentenceDone ? 
+              currentSentence.en.split(' ').map((word, index) => React.createElement('span', { key: index, className: `inline-block px-1 py-1 rounded-md transition-all duration-200 ${highlightedIndex === index ? 'bg-yellow-300 text-black scale-110' : 'bg-transparent text-slate-800 scale-100'}`}, word)) :
+              currentWords.map((_, index) => React.createElement('div', { key: index, className: `h-16 w-24 flex items-center justify-center text-xl font-semibold p-2 rounded-lg ${playerAnswer[index] ? 'bg-purple-200 border-2 border-purple-500 text-purple-900' : 'bg-slate-200 border-2 border-dashed border-slate-400'}`}, playerAnswer[index]))
+          ),
+          React.createElement('div', { className: "min-h-[30px] text-xl font-bold" },
+            message && React.createElement('p', { className: `${message.type === 'success' ? 'text-green-600' : 'text-red-500'}` }, message.text)
+          ),
+          React.createElement('div', { className: "flex flex-wrap justify-center gap-3 mt-1 mb-4 w-full min-h-[120px]" },
+            shuffledWords.map((word, index) => {
+              const isUsed = word === '';
+              const isIncorrect = incorrectWord === `${word}-${index}`;
+              const pastelColor = pastelColors[index % pastelColors.length];
+              return React.createElement('button', {
+                key: index,
+                onClick: () => handleWordClick(word, index),
+                disabled: isUsed || isSentenceDone,
+                className: `text-xl font-bold py-3 px-5 rounded-xl border-b-4 transition-all duration-150 transform active:translate-y-0.5 active:border-b-2 ${isUsed ? 'opacity-0 pointer-events-none' : 'opacity-100'} ${isIncorrect ? 'border-red-500 animate-shake bg-red-100 text-red-600' : `${pastelColor} hover:-translate-y-1 hover:shadow-md`} ${isSentenceDone ? 'cursor-not-allowed' : ''}`
+              }, word);
+            })
+          ),
+          React.createElement('div', { className: "flex flex-wrap justify-center items-center gap-4 my-4" },
+            React.createElement('button', { onClick: handleListenAgain, disabled: isSentenceDone || isSpeaking, className: "py-3 px-8 text-lg font-bold bg-purple-600 text-white rounded-xl shadow-md transform hover:-translate-y-1 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed disabled:transform-none" }, "Nghe lại"),
+             React.createElement('div', { className: "relative" },
+                React.createElement('select', {
+                  value: selectedVoiceURI || '',
+                  onChange: (e) => setSelectedVoiceURI(e.target.value),
+                  disabled: voices.length === 0 || isSpeaking,
+                  'aria-label': "Chọn giọng đọc",
+                  className: "py-3 px-5 text-lg font-bold bg-white text-slate-800 rounded-xl shadow-md appearance-none border-2 border-purple-300 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all cursor-pointer disabled:bg-gray-200 disabled:cursor-not-allowed"
+                },
+                  voices.length === 0 ? 
+                    React.createElement('option', {}, "Tải giọng đọc...") :
+                    voices.map(voice => React.createElement('option', { key: voice.voiceURI, value: voice.voiceURI }, voice.name))
+                ),
+                React.createElement('div', { className: "pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700" },
+                  React.createElement('svg', { className: "fill-current h-4 w-4", xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 20 20" },
+                    React.createElement('path', { d: "M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" })
+                  )
+                )
+            ),
+            React.createElement('button', { onClick: onChooseAnotherTopic, className: "py-3 px-8 text-lg font-bold bg-yellow-500 text-slate-800 rounded-xl shadow-md transform hover:-translate-y-1 transition-all" }, "Chọn chủ đề khác")
+          ),
+          React.createElement('div', { className: "text-xl font-bold text-purple-800 mt-4" }, `Điểm: ${score} | Hoàn thành: ${currentIndex}/${sentences.length}`)
+        );
+      };
+      
+      // --- From App.tsx ---
+      const App = () => {
+        const [gameState, setGameState] = useState(GameState.Start);
+        const [playerName, setPlayerName] = useState('');
+        const [selectedTopic, setSelectedTopic] = useState('');
+        const [topicSentences, setTopicSentences] = useState([]);
+        const [lastScore, setLastScore] = useState({ correct: 0, total: 0 });
+
+        const handleStart = useCallback((name) => {
+          setPlayerName(name);
+          setGameState(GameState.TopicSelection);
+        }, []);
+
+        const handleSelectTopic = useCallback((topicName) => {
+          setSelectedTopic(topicName);
+          setTopicSentences(topics[topicName]);
+          setGameState(GameState.Playing);
+        }, []);
+
+        const handleTopicComplete = useCallback((correct, total) => {
+          setLastScore({ correct, total });
+          setGameState(GameState.Congrats);
+        }, []);
+        
+        const handlePlayAgain = useCallback(() => {
+          if (selectedTopic && topics[selectedTopic]) {
+            setTopicSentences(topics[selectedTopic]);
+            setGameState(GameState.Playing);
+          } else {
+            setGameState(GameState.TopicSelection);
+          }
+        }, [selectedTopic]);
+
+        const handleChooseAnotherTopic = useCallback(() => {
+          setSelectedTopic('');
+          setTopicSentences([]);
+          setGameState(GameState.TopicSelection);
+        }, []);
+
+        const renderScreen = () => {
+          switch (gameState) {
+            case GameState.Start:
+              return React.createElement(StartScreen, { onStart: handleStart });
+            case GameState.TopicSelection:
+              return React.createElement(TopicSelectionScreen, { topics: Object.keys(topics), onSelectTopic: handleSelectTopic });
+            case GameState.Playing:
+              return React.createElement(GameScreen, { key: selectedTopic, sentences: topicSentences, onTopicComplete: handleTopicComplete, onChooseAnotherTopic: handleChooseAnotherTopic });
+            case GameState.Congrats:
+              return React.createElement(TopicCongratsScreen, {
+                  playerName: playerName,
+                  topicName: selectedTopic,
+                  correctCount: lastScore.correct,
+                  totalCount: lastScore.total,
+                  onPlayAgain: handlePlayAgain,
+                  onChooseAnotherTopic: handleChooseAnotherTopic,
+                });
+            default:
+              return React.createElement(StartScreen, { onStart: handleStart });
+          }
+        };
+
+        return React.createElement('div', { className: "bg-gradient-to-br from-violet-100 to-sky-100 min-h-screen w-full flex justify-center items-center p-4" },
+          React.createElement('main', { className: "container mx-auto text-center p-6 max-w-4xl w-full bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl shadow-violet-200" },
+            React.createElement('h1', { className: "text-3xl sm:text-4xl md:text-5xl font-extrabold text-violet-600 mb-1 [text-shadow:_1px_2px_2px_rgb(0_0_0_/_10%)]" }, "NGHE VÀ XẾP TỪ THÀNH CÂU"),
+            React.createElement('h2', { className: "text-xl sm:text-2xl md:text-3xl text-slate-500 font-semibold mb-5" }, "(Hỏi & Đáp)"),
+            renderScreen()
+          )
+        );
+      };
+
+      // --- From index.tsx ---
+      const rootElement = document.getElementById('root');
+      const root = ReactDOM.createRoot(rootElement);
+      root.render(React.createElement(App));
+    </script>
+</body>
+</html>
